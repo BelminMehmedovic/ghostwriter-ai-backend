@@ -1,0 +1,80 @@
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const admin = require("firebase-admin");
+
+// Initialize Firebase Admin SDK
+const serviceAccount = require("./serviceAccountKey.json");
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = process.env.PORT || 5050;
+
+// Route to start Stripe checkout
+app.post("/start-checkout", async (req, res) => {
+    try {
+        const { email, priceId } = req.body;
+
+        if (!email || !priceId) {
+            return res.status(400).json({ error: "Email and priceId are required" });
+        }
+
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ["card"],
+            mode: "subscription",
+            customer_email: email,
+            line_items: [{ price: priceId, quantity: 1 }],
+            success_url: "http://localhost:5050/checkout-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url: "http://localhost:5050/checkout-cancel",
+        });
+
+        res.json({ url: session.url });
+    } catch (error) {
+        console.error("Error creating Stripe checkout session:", error);
+        res.status(500).json({ error: "Failed to start checkout" });
+    }
+});
+
+// Route to check subscription status
+app.post("/check-subscription", async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: "Email is required" });
+        }
+
+        // Retrieve customer data from Stripe
+        const customers = await stripe.customers.list({ email });
+
+        if (!customers.data.length) {
+            return res.status(404).json({ error: "Customer not found" });
+        }
+
+        const customerId = customers.data[0].id;
+        const subscriptions = await stripe.subscriptions.list({
+            customer: customerId,
+            status: "active",
+        });
+
+        if (subscriptions.data.length === 0) {
+            return res.status(403).json({ error: "No active subscription" });
+        }
+
+        res.json({ status: "active" });
+    } catch (error) {
+        console.error("Error checking subscription:", error);
+        res.status(500).json({ error: "Failed to check subscription" });
+    }
+});
+
+// Start the server
+app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+});
