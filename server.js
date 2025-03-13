@@ -14,12 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5050; // Use Render's assigned port or default to 5050
-
-// Health check route for Render
-app.get("/healthz", (req, res) => {
-    res.status(200).send("Server is healthy!");
-});
+const PORT = process.env.PORT || 5050; // Render will assign a port, use process.env.PORT
 
 // Route to start Stripe checkout
 app.post("/start-checkout", async (req, res) => {
@@ -35,8 +30,8 @@ app.post("/start-checkout", async (req, res) => {
             mode: "subscription",
             customer_email: email,
             line_items: [{ price: priceId, quantity: 1 }],
-            success_url: "https://yourfrontend.com/checkout-success?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url: "https://yourfrontend.com/checkout-cancel",
+            success_url: "https://yourdomain.com/checkout-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url: "https://yourdomain.com/checkout-cancel",
         });
 
         res.json({ url: session.url });
@@ -55,7 +50,6 @@ app.post("/check-subscription", async (req, res) => {
             return res.status(400).json({ error: "Email is required" });
         }
 
-        // Retrieve customer data from Stripe
         const customers = await stripe.customers.list({ email });
 
         if (!customers.data.length) {
@@ -77,6 +71,11 @@ app.post("/check-subscription", async (req, res) => {
         console.error("Error checking subscription:", error);
         res.status(500).json({ error: "Failed to check subscription" });
     }
+});
+
+// Health Check Endpoint
+app.get("/healthz", (req, res) => {
+    res.status(200).send("OK");
 });
 
 // Start the server
