@@ -19,7 +19,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000; // Render assigns a port, so we use process.env.PORT
 
-// ✅ Added a root route to avoid "Cannot GET /" error
+// ✅ Root route
 app.get("/", (req, res) => {
     res.send("✅ Ghostwriter Backend is Running!");
 });
@@ -29,7 +29,24 @@ app.get("/healthz", (req, res) => {
     res.status(200).send("OK");
 });
 
-// ✅ Added Firebase Auth Check Route
+// ✅ Debug Token Route (Decode Firebase Token)
+app.get("/debugToken", async (req, res) => {
+    const idToken = req.headers.authorization && req.headers.authorization.split("Bearer ")[1];
+
+    if (!idToken) {
+        return res.status(401).json({ error: "Unauthorized – No token provided" });
+    }
+
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        return res.json(decodedToken);
+    } catch (error) {
+        console.error("Error decoding auth token:", error);
+        return res.status(403).json({ error: "Invalid token" });
+    }
+});
+
+// ✅ Firebase Auth Check Route
 app.get("/authCheck", async (req, res) => {
     const idToken = req.headers.authorization && req.headers.authorization.split("Bearer ")[1];
 
@@ -41,7 +58,6 @@ app.get("/authCheck", async (req, res) => {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         const userId = decodedToken.uid;
 
-        // Fetch user subscription data from Firestore
         const db = admin.firestore();
         const userDoc = await db.collection("users").doc(userId).get();
 
@@ -50,17 +66,17 @@ app.get("/authCheck", async (req, res) => {
         }
 
         const userData = userDoc.data();
-        const subscriptionStatus = userData.subscriptionStatus || "inactive"; // Default to inactive if missing
-        const plan = userData.plan || "free"; // Default plan
-
-        return res.json({ subscriptionStatus, plan });
+        return res.json({
+            subscriptionStatus: userData.subscriptionStatus || "inactive",
+            plan: userData.plan || "free",
+        });
     } catch (error) {
         console.error("Error verifying auth token:", error);
         return res.status(403).json({ error: "Invalid token" });
     }
 });
 
-// Route to start Stripe checkout
+// ✅ Start Stripe Checkout
 app.post("/start-checkout", async (req, res) => {
     try {
         const { email, priceId } = req.body;
@@ -85,7 +101,7 @@ app.post("/start-checkout", async (req, res) => {
     }
 });
 
-// Route to check subscription status
+// ✅ Check Subscription Status
 app.post("/check-subscription", async (req, res) => {
     try {
         const { email } = req.body;
