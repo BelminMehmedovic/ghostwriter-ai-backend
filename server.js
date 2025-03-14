@@ -29,6 +29,37 @@ app.get("/healthz", (req, res) => {
     res.status(200).send("OK");
 });
 
+// ✅ Added Firebase Auth Check Route
+app.get("/authCheck", async (req, res) => {
+    const idToken = req.headers.authorization && req.headers.authorization.split("Bearer ")[1];
+
+    if (!idToken) {
+        return res.status(401).json({ error: "Unauthorized – No token provided" });
+    }
+
+    try {
+        const decodedToken = await admin.auth().verifyIdToken(idToken);
+        const userId = decodedToken.uid;
+
+        // Fetch user subscription data from Firestore
+        const db = admin.firestore();
+        const userDoc = await db.collection("users").doc(userId).get();
+
+        if (!userDoc.exists) {
+            return res.status(404).json({ error: "User not found in database" });
+        }
+
+        const userData = userDoc.data();
+        const subscriptionStatus = userData.subscriptionStatus || "inactive"; // Default to inactive if missing
+        const plan = userData.plan || "free"; // Default plan
+
+        return res.json({ subscriptionStatus, plan });
+    } catch (error) {
+        console.error("Error verifying auth token:", error);
+        return res.status(403).json({ error: "Invalid token" });
+    }
+});
+
 // Route to start Stripe checkout
 app.post("/start-checkout", async (req, res) => {
     try {
