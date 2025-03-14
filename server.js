@@ -5,16 +5,29 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const admin = require("firebase-admin");
 
 // Initialize Firebase Admin SDK
-const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS || "{}");
+
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+    });
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 5050; // Render will assign a port, use process.env.PORT
+const PORT = process.env.PORT || 10000; // Render assigns a port, so we use process.env.PORT
+
+// ✅ Added a root route to avoid "Cannot GET /" error
+app.get("/", (req, res) => {
+    res.send("✅ Ghostwriter Backend is Running!");
+});
+
+// ✅ Health Check Endpoint
+app.get("/healthz", (req, res) => {
+    res.status(200).send("OK");
+});
 
 // Route to start Stripe checkout
 app.post("/start-checkout", async (req, res) => {
@@ -71,11 +84,6 @@ app.post("/check-subscription", async (req, res) => {
         console.error("Error checking subscription:", error);
         res.status(500).json({ error: "Failed to check subscription" });
     }
-});
-
-// Health Check Endpoint
-app.get("/healthz", (req, res) => {
-    res.status(200).send("OK");
 });
 
 // Start the server
