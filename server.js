@@ -96,7 +96,7 @@ app.post("/start-checkout", async (req, res) => {
     }
 });
 
-// ✅ Check Subscription Status
+// ✅ Check Subscription Status (AI-Specific)
 app.post("/check-subscription", async (req, res) => {
     try {
         const { email } = req.body;
@@ -111,7 +111,18 @@ app.post("/check-subscription", async (req, res) => {
             status: "active",
         });
 
-        if (subscriptions.data.length === 0) return res.status(403).json({ error: "No active subscription" });
+        const aiPriceIds = [
+            "price_1RAAU5KEH8G5257ifhD9VhcI", // AI Monthly
+            "price_1RAAUuKEH8G52S7izY10PITb"  // AI Yearly
+        ];
+
+        const hasAISubscription = subscriptions.data.some(sub =>
+            sub.items.data.some(item => aiPriceIds.includes(item.price.id))
+        );
+
+        if (!hasAISubscription) {
+            return res.status(403).json({ error: "No active AI subscription" });
+        }
 
         res.json({ status: "active" });
     } catch (error) {
