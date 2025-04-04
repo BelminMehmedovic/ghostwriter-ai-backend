@@ -109,6 +109,7 @@ app.post("/check-subscription", async (req, res) => {
         const subscriptions = await stripe.subscriptions.list({
             customer: customerId,
             status: "active",
+            expand: ["data.items"],
         });
 
         const aiPriceIds = [
