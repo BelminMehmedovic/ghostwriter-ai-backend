@@ -1,10 +1,9 @@
-
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const admin = require("firebase-admin");
-const { OpenAI } = require("openai");
+const { Configuration, OpenAIApi } = require("openai");
 
 // Initialize Firebase Admin SDK
 const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS || "{}");
@@ -20,7 +19,11 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY,
+});
+const openai = new OpenAIApi(configuration);
 
 // ✅ Root route
 app.get("/", (req, res) => {
@@ -123,7 +126,7 @@ app.post("/generateAI", async (req, res) => {
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
     try {
-        const response = await openai.chat.completions.create({
+        const response = await openai.createChatCompletion({
             model: "gpt-4.5-preview",
             messages: [
                 { role: "system", content: "You're a helpful assistant who writes with clarity and a friendly tone." },
@@ -131,7 +134,7 @@ app.post("/generateAI", async (req, res) => {
             ]
         });
 
-        const answer = response.choices?.[0]?.message?.content?.trim();
+        const answer = response.data.choices?.[0]?.message?.content?.trim();
         res.json({ status: "success", text: answer });
     } catch (err) {
         console.error("OpenAI error:", err.message);
