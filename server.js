@@ -120,13 +120,13 @@ app.post("/check-subscription", async (req, res) => {
     }
 });
 
-// ✅ OpenAI Endpoint
+// ✅ OpenAI Endpoint (v3.2.1-compatible)
 app.post("/generateAI", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
 
     try {
-        const response = await openai.createChatCompletion({
+        const completion = await openai.createChatCompletion({
             model: "gpt-4.5-preview",
             messages: [
                 { role: "system", content: "You're a helpful assistant who writes with clarity and a friendly tone." },
@@ -134,10 +134,10 @@ app.post("/generateAI", async (req, res) => {
             ]
         });
 
-        const answer = response.data.choices?.[0]?.message?.content?.trim();
+        const answer = completion.data.choices?.[0]?.message?.content?.trim();
         res.json({ status: "success", text: answer });
     } catch (err) {
-        console.error("OpenAI error:", err.message);
+        console.error("OpenAI error:", err.response?.data || err.message);
         res.status(500).json({ status: "error", message: err.message });
     }
 });
