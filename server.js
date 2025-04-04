@@ -1,8 +1,10 @@
+
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const admin = require("firebase-admin");
+const { OpenAI } = require("openai");
 
 // Initialize Firebase Admin SDK
 const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS || "{}");
@@ -17,7 +19,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 10000; // Render assigns a port, so we use process.env.PORT
+const PORT = process.env.PORT || 10000;
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ✅ Root route
 app.get("/", (req, res) => {
@@ -29,13 +32,10 @@ app.get("/healthz", (req, res) => {
     res.status(200).send("OK");
 });
 
-// ✅ Debug Token Route (Decode Firebase Token)
+// ✅ Debug Token Route
 app.get("/debugToken", async (req, res) => {
     const idToken = req.headers.authorization && req.headers.authorization.split("Bearer ")[1];
-
-    if (!idToken) {
-        return res.status(401).json({ error: "Unauthorized – No token provided" });
-    }
+    if (!idToken) return res.status(401).json({ error: "Unauthorized – No token provided" });
 
     try {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -49,10 +49,7 @@ app.get("/debugToken", async (req, res) => {
 // ✅ Firebase Auth Check Route
 app.get("/authCheck", async (req, res) => {
     const idToken = req.headers.authorization && req.headers.authorization.split("Bearer ")[1];
-
-    if (!idToken) {
-        return res.status(401).json({ error: "Unauthorized – No token provided" });
-    }
+    if (!idToken) return res.status(401).json({ error: "Unauthorized – No token provided" });
 
     try {
         const decodedToken = await admin.auth().verifyIdToken(idToken);
@@ -61,9 +58,7 @@ app.get("/authCheck", async (req, res) => {
         const db = admin.firestore();
         const userDoc = await db.collection("users").doc(userId).get();
 
-        if (!userDoc.exists) {
-            return res.status(404).json({ error: "User not found in database" });
-        }
+        if (!userDoc.exists) return res.status(404).json({ error: "User not found in database" });
 
         const userData = userDoc.data();
         return res.json({
@@ -80,10 +75,7 @@ app.get("/authCheck", async (req, res) => {
 app.post("/start-checkout", async (req, res) => {
     try {
         const { email, priceId } = req.body;
-
-        if (!email || !priceId) {
-            return res.status(400).json({ error: "Email and priceId are required" });
-        }
+        if (!email || !priceId) return res.status(400).json({ error: "Email and priceId are required" });
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ["card"],
@@ -105,16 +97,10 @@ app.post("/start-checkout", async (req, res) => {
 app.post("/check-subscription", async (req, res) => {
     try {
         const { email } = req.body;
-
-        if (!email) {
-            return res.status(400).json({ error: "Email is required" });
-        }
+        if (!email) return res.status(400).json({ error: "Email is required" });
 
         const customers = await stripe.customers.list({ email });
-
-        if (!customers.data.length) {
-            return res.status(404).json({ error: "Customer not found" });
-        }
+        if (!customers.data.length) return res.status(404).json({ error: "Customer not found" });
 
         const customerId = customers.data[0].id;
         const subscriptions = await stripe.subscriptions.list({
@@ -122,9 +108,7 @@ app.post("/check-subscription", async (req, res) => {
             status: "active",
         });
 
-        if (subscriptions.data.length === 0) {
-            return res.status(403).json({ error: "No active subscription" });
-        }
+        if (subscriptions.data.length === 0) return res.status(403).json({ error: "No active subscription" });
 
         res.json({ status: "active" });
     } catch (error) {
@@ -133,7 +117,29 @@ app.post("/check-subscription", async (req, res) => {
     }
 });
 
-// Start the server
+// ✅ OpenAI Endpoint
+app.post("/generateAI", async (req, res) => {
+    const { prompt } = req.body;
+    if (!prompt) return res.status(400).json({ error: "Missing prompt" });
+
+    try {
+        const response = await openai.chat.completions.create({
+            model: "gpt-4.5-preview",
+            messages: [
+                { role: "system", content: "You're a helpful assistant who writes with clarity and a friendly tone." },
+                { role: "user", content: prompt }
+            ]
+        });
+
+        const answer = response.choices?.[0]?.message?.content?.trim();
+        res.json({ status: "success", text: answer });
+    } catch (err) {
+        console.error("OpenAI error:", err.message);
+        res.status(500).json({ status: "error", message: err.message });
+    }
+});
+
+// ✅ Start server
 app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
 });
