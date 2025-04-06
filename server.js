@@ -122,7 +122,7 @@ app.post("/check-subscription", async (req, res) => {
 
         // ✅ Only allow these AI price IDs
         const aiPriceIds = [
-            "price_1RAAU5KEH8G5257ifhD9VhcI", // AI Monthly
+            "price_1RAAU5KEH8G52S7ifhD9VhcI", // AI Monthly
             "price_1RAAUuKEH8G52S7izY10PITb"  // AI Yearly
         ];
 
