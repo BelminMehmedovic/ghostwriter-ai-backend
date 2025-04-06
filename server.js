@@ -96,7 +96,7 @@ app.post("/start-checkout", async (req, res) => {
     }
 });
 
-// ✅ Check Subscription Status (AI-Specific)
+// ✅ Check Subscription Status (AI-Only w/ Logging)
 app.post("/check-subscription", async (req, res) => {
     try {
         const { email } = req.body;
@@ -112,6 +112,15 @@ app.post("/check-subscription", async (req, res) => {
             expand: ["data.items"],
         });
 
+        // 🧾 Log subscriptions for debugging
+        console.log(`🧾 Subscriptions for ${email}:`);
+        subscriptions.data.forEach((sub, index) => {
+            sub.items.data.forEach((item) => {
+                console.log(`👉 Sub ${index + 1}: price_id=${item.price.id}`);
+            });
+        });
+
+        // ✅ Only allow these AI price IDs
         const aiPriceIds = [
             "price_1RAAU5KEH8G5257ifhD9VhcI", // AI Monthly
             "price_1RAAUuKEH8G52S7izY10PITb"  // AI Yearly
@@ -122,17 +131,18 @@ app.post("/check-subscription", async (req, res) => {
         );
 
         if (!hasAISubscription) {
+            console.warn("❌ No valid AI subscription found.");
             return res.status(403).json({ error: "No active AI subscription" });
         }
 
         res.json({ status: "active" });
     } catch (error) {
-        console.error("Error checking subscription:", error);
+        console.error("❌ Error checking subscription:", error);
         res.status(500).json({ error: "Failed to check subscription" });
     }
 });
 
-// ✅ OpenAI Endpoint (v3.2.1-compatible)
+// ✅ OpenAI Endpoint
 app.post("/generateAI", async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) return res.status(400).json({ error: "Missing prompt" });
