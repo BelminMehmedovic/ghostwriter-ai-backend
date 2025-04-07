@@ -102,6 +102,20 @@ app.post("/check-subscription", async (req, res) => {
         const { email } = req.body;
         if (!email) return res.status(400).json({ error: "Email is required" });
 
+        const db = admin.firestore();
+        const userSnap = await db.collection("users").where("email", "==", email).get();
+        let isTestUser = false;
+
+        if (!userSnap.empty) {
+            const userData = userSnap.docs[0].data();
+            isTestUser = userData.isTestUser === true;
+        }
+
+        if (isTestUser) {
+            console.log("✅ Test user override granted");
+            return res.json({ status: "active" });
+        }
+
         const customers = await stripe.customers.list({ email });
         if (!customers.data.length) return res.status(404).json({ error: "Customer not found" });
 
